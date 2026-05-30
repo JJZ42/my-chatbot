@@ -2,11 +2,12 @@ import os
 import streamlit as st
 from openai import OpenAI
 from dotenv import load_dotenv
-import chromadb
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+import numpy as np
 
 load_dotenv()
 
-# ===== 页面设置（必须第一个Streamlit命令）=====
 st.set_page_config(
     page_title="DeepSeek 知识库助手",
     page_icon="📚",
@@ -32,13 +33,9 @@ if not st.session_state.authenticated:
     st.stop()
 
 # ============================================
-# 登录成功后的主界面
-# ============================================
-
 st.title("📚 DeepSeek 知识库问答机器人")
 st.caption("上传专属知识 → DeepSeek 基于你的文档回答 · 私人版")
 
-# ===== DeepSeek 客户端 =====
 @st.cache_resource
 def get_client():
     return OpenAI(
@@ -49,49 +46,31 @@ def get_client():
 client = get_client()
 
 # ============================================
-# 知识库函数
+# 知识库函数（用 TF-IDF 代替 chromadb）
 # ============================================
 
 def create_knowledge_base(texts):
-    """把文本列表变成可搜索的知识库"""
-    chroma_client = chromadb.Client()
-    
-    try:
-        chroma_client.delete_collection("my_docs")
-    except:
-        pass
-    
-    collection = chroma_client.create_collection(
-        "my_docs",
-        metadata={"hnsw:space": "cosine"}
-    )
-    
-    for i, text in enumerate(texts):
-        collection.add(
-            documents=[text],
-            ids=[f"id_{i}"]
-        )
-    
-    return collection
+    """返回 vectorizer + 文档向量矩阵"""
+    vectorizer = TfidfVectorizer()
+    doc_vectors = vectorizer.fit_transform(texts)
+    return vectorizer, doc_vectors, texts
 
 
-def search_docs(collection, query, top_n=3):
-    """从知识库搜索最相关的内容"""
-    results = collection.query(
-        query_texts=[query],
-        n_results=top_n
-    )
-    return results['documents'][0]
-
+def search_docs(kb_data, query, top_n=3):
+    """搜索最相关的内容"""
+    vectorizer, doc_vectors, texts = kb_data
+    query_vec = vectorizer.transform([query])
+    similarities = cosine_similarity(query_vec, doc_vectors)[0]
+    top_indices = np.argsort(similarities)[-top_n:][::-1]
+    return [texts[i] for i in top_indices]
 
 # ============================================
-# 侧边栏：知识库管理 + 设置
+# 侧边栏
 # ============================================
 
 with st.sidebar:
     st.header("📄 知识库管理")
     
-    # 方式一：粘贴文本
     st.subheader("方式一：粘贴文本")
     st.caption("每段知识用 --- 分隔")
     raw_text = st.text_area(
@@ -108,7 +87,6 @@ with st.sidebar:
         else:
             st.warning("请先粘贴知识内容")
     
-    # 方式二：示例知识库
     st.divider()
     st.subheader("方式二：加载示例")
     
@@ -153,16 +131,13 @@ with st.sidebar:
             st.session_state.kb = create_knowledge_base(sample_c)
             st.success(f"✅ 已加载 {len(sample_c)} 条C语言知识")
     
-    # 状态提示
     if "kb" in st.session_state:
         st.info("📌 知识库已就绪")
     
-    # 清空对话
     st.divider()
     if st.button("🗑️ 清空对话", use_container_width=True):
         st.session_state.messages_rag = []
         st.rerun()
-
 
 # ============================================
 # 主对话区域
@@ -185,15 +160,13 @@ if user_input := st.chat_input("基于知识库提问（例如：list和tuple的
             st.warning("⚠️ 请先在左边加载知识库！")
             answer = "请先加载知识库，我才能基于文档回答。点击左边「📥 Python入门」或「📥 C语言基础」加载示例，或粘贴你自己的知识。"
         else:
-            # ① 检索
             with st.spinner("🔍 检索知识库..."):
                 relevant_docs = search_docs(st.session_state.kb, user_input, top_n=3)
             
-            # ② 构建提示词
             context = "\n\n".join(relevant_docs)
             prompt = f"""你是一个严格基于文档的问答助手。
 
-## ⚠️ 核心规则（必须遵守）
+## ⚠️ 核心规则
 - 只根据下面「参考资料」中的内容回答问题
 - 如果参考资料中没有相关信息，直接回复："抱歉，知识库中没有找到相关内容"
 - 引用原文时用引号标出
@@ -207,7 +180,6 @@ if user_input := st.chat_input("基于知识库提问（例如：list和tuple的
 
 ## 你的回答："""
             
-            # ③ 生成
             with st.spinner("💭 DeepSeek 生成回答..."):
                 response = client.chat.completions.create(
                     model="deepseek-chat",
@@ -219,7 +191,6 @@ if user_input := st.chat_input("基于知识库提问（例如：list和tuple的
             
             st.markdown(answer)
             
-            # 参考来源
             with st.expander("📖 参考的知识片段"):
                 for i, doc in enumerate(relevant_docs, 1):
                     st.caption(f"**片段 {i}：** {doc}")
