@@ -1,10 +1,15 @@
 import os
+import io
 import streamlit as st
 from openai import OpenAI
 from dotenv import load_dotenv
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
+
+# PDF / Word 文本提取
+from PyPDF2 import PdfReader
+from docx import Document
 
 load_dotenv()
 
@@ -69,6 +74,74 @@ def search_docs(kb_data, query, top_n=3):
     similarities = cosine_similarity(query_vec, doc_vectors)[0]
     top_indices = np.argsort(similarities)[-top_n:][::-1]
     return [texts[i] for i in top_indices]
+
+# ============================================
+# 文件提取函数
+# ============================================
+
+def extract_text_from_pdf(file_bytes):
+    """从 PDF 字节流提取文本"""
+    reader = PdfReader(io.BytesIO(file_bytes))
+    text_parts = []
+    for page in reader.pages:
+        page_text = page.extract_text()
+        if page_text:
+            text_parts.append(page_text)
+    return "\n".join(text_parts)
+
+
+def extract_text_from_docx(file_bytes):
+    """从 Word .docx 字节流提取文本"""
+    doc = Document(io.BytesIO(file_bytes))
+    text_parts = []
+    for para in doc.paragraphs:
+        if para.text.strip():
+            text_parts.append(para.text)
+    return "\n\n".join(text_parts)
+
+
+def extract_text_from_file(uploaded_file):
+    """根据文件类型自动选择提取方式"""
+    file_bytes = uploaded_file.read()
+    name = uploaded_file.name.lower()
+    if name.endswith(".pdf"):
+        return extract_text_from_pdf(file_bytes)
+    elif name.endswith(".docx"):
+        return extract_text_from_docx(file_bytes)
+    else:
+        return None
+
+
+def split_into_chunks(text, min_len=20):
+    """将长文本按段落切分为知识片段
+    
+    - 先用双换行（段落间空行）切分
+    - 过滤掉过短的片段
+    - 每个片段作为一条知识
+    """
+    # 规范化换行：多个连续换行统一为双换行
+    import re
+    text = re.sub(r"\n{2,}", "\n\n", text)
+    text = re.sub(r"(?<!\n)\n(?!\n)", "\n\n", text)  # 单换行也升级为双换行
+    # 按段落切分
+    raw_chunks = text.split("\n\n")
+    chunks = []
+    for ch in raw_chunks:
+        ch = ch.strip()
+        # 跳过空段和过短段
+        if len(ch) >= min_len:
+            # 如果单段太长（>500字），按句号再切一次
+            if len(ch) > 500:
+                sub_chunks = [s.strip() + "。" for s in ch.split("。") if s.strip()]
+                # 句子级别阈值（中文短句常见 4~8 字）
+                sub_min = 3
+                for sc in sub_chunks:
+                    if len(sc) >= sub_min:
+                        chunks.append(sc)
+            else:
+                chunks.append(ch)
+    return chunks
+
 
 # ============================================
 # 侧边栏
@@ -242,6 +315,39 @@ with st.sidebar:
             if not st.session_state.active_kb:
                 st.session_state.active_kb = "C语言基础"
             st.success(f"✅ 已加载 {len(sample_c)} 条C语言知识")
+    
+    st.divider()
+    st.subheader("方式三：上传文件 📎")
+    st.caption("支持 PDF / Word，拖拽或点击上传")
+    
+    uploaded_files = st.file_uploader(
+        "上传文档",
+        type=["pdf", "docx"],
+        accept_multiple_files=True,
+        label_visibility="collapsed",
+    )
+    
+    if uploaded_files:
+        for uf in uploaded_files:
+            # 提取文本
+            with st.spinner(f"📄 正在解析 {uf.name}..."):
+                raw_text = extract_text_from_file(uf)
+            
+            if raw_text is None:
+                st.error(f"❌ {uf.name}：不支持的文件格式")
+            elif not raw_text.strip():
+                st.error(f"❌ {uf.name}：无法提取文字（可能是扫描件或图片PDF）")
+            else:
+                chunks = split_into_chunks(raw_text)
+                if not chunks:
+                    st.error(f"❌ {uf.name}：提取的文字太短")
+                else:
+                    # 文件名去掉后缀作为知识库名称
+                    kb_name = os.path.splitext(uf.name)[0]
+                    st.session_state.knowledge_bases[kb_name] = chunks
+                    if not st.session_state.active_kb:
+                        st.session_state.active_kb = kb_name
+                    st.success(f"✅ {uf.name} → 「{kb_name}」({len(chunks)} 条知识)")
     
     st.divider()
     
