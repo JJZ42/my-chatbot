@@ -310,7 +310,7 @@ if not st.session_state.authenticated:
     st.markdown('<div class="login-card-title">私人 AI 助手</div>', unsafe_allow_html=True)
     st.markdown('<div class="login-card-subtitle">🔑 请输入密码以访问知识库</div>', unsafe_allow_html=True)
     
-    with st.form("login_form", clear_on_submit=False):
+    with st.form("login_form"):
         password = st.text_input(
             "🔑 访问密码",
             type="password",
