@@ -205,6 +205,48 @@ st.markdown("""
     margin-bottom: 28px;
 }
 
+/* 登录表单内元素 */
+.login-card label {
+    color: #cbd5e1 !important;
+    font-size: 0.9rem !important;
+    font-weight: 500 !important;
+}
+
+.login-card .stTextInput > div > div > input {
+    background: rgba(15, 12, 41, 0.6) !important;
+    border: 1px solid rgba(139, 92, 246, 0.35) !important;
+    color: #f1f5f9 !important;
+    border-radius: 12px !important;
+    padding: 12px 16px !important;
+    font-size: 1rem !important;
+    transition: all 0.25s ease !important;
+}
+
+.login-card .stTextInput > div > div > input:focus {
+    border-color: rgba(139, 92, 246, 0.7) !important;
+    box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.15) !important;
+}
+
+.login-card .stTextInput > div > div > input::placeholder {
+    color: #64748b !important;
+}
+
+.login-card .stFormSubmitButton > button {
+    background: linear-gradient(135deg, #7c3aed, #4f46e5) !important;
+    border: none !important;
+    color: #f1f5f9 !important;
+    font-weight: 700 !important;
+    border-radius: 12px !important;
+    padding: 10px 24px !important;
+    transition: all 0.3s ease !important;
+}
+
+.login-card .stFormSubmitButton > button:hover {
+    background: linear-gradient(135deg, #8b5cf6, #6366f1) !important;
+    box-shadow: 0 6px 24px rgba(124, 58, 237, 0.4) !important;
+    transform: translateY(-2px);
+}
+
 /* ===== 全局组件 ===== */
 /* 主页面按钮 */
 .stButton > button {
@@ -262,20 +304,29 @@ if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
 
 if not st.session_state.authenticated:
-    # 卡片式登录页 — card 先不关闭，让 Streamlit 控件落在卡片内
+    # 卡片式登录页 — 使用 st.form 支持 Enter 键提交
     st.markdown('<div class="login-container"><div class="login-card">', unsafe_allow_html=True)
     st.markdown('<div class="floating-logo">🤖</div>', unsafe_allow_html=True)
     st.markdown('<div class="login-card-title">私人 AI 助手</div>', unsafe_allow_html=True)
-    st.markdown('<div class="login-card-subtitle">请输入密码以访问知识库</div>', unsafe_allow_html=True)
-    password = st.text_input("密码", type="password", placeholder="输入访问密码", label_visibility="collapsed")
-    col_btn1, col_btn2, col_btn3 = st.columns([1, 1, 1])
-    with col_btn2:
-        if st.button("🔓 登 录", use_container_width=True):
+    st.markdown('<div class="login-card-subtitle">🔑 请输入密码以访问知识库</div>', unsafe_allow_html=True)
+    
+    with st.form("login_form", clear_on_submit=False):
+        password = st.text_input(
+            "🔑 访问密码",
+            type="password",
+            placeholder="请输入密码后按 Enter 或点击登录",
+        )
+        col_btn1, col_btn2, col_btn3 = st.columns([1, 1.2, 1])
+        with col_btn2:
+            submitted = st.form_submit_button("🔓 登 录", use_container_width=True)
+        
+        if submitted:
             if password == ACCESS_PASSWORD:
                 st.session_state.authenticated = True
                 st.rerun()
             else:
-                st.error("密码错误！")
+                st.error("❌ 密码错误，请重试")
+    
     st.markdown('</div></div>', unsafe_allow_html=True)
     st.stop()
 
