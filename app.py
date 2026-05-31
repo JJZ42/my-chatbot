@@ -49,8 +49,10 @@ client = get_client()
 # 知识库函数（用 TF-IDF 代替 chromadb）
 # ============================================
 
-def create_knowledge_base(texts):
-    """返回 vectorizer + 文档向量矩阵"""
+@st.cache_resource
+def compute_tfidf(texts_tuple):
+    """缓存 TF-IDF 计算结果。texts_tuple 必须是 tuple（hashable）。"""
+    texts = list(texts_tuple)
     vectorizer = TfidfVectorizer()
     doc_vectors = vectorizer.fit_transform(texts)
     return vectorizer, doc_vectors, texts
@@ -71,19 +73,64 @@ def search_docs(kb_data, query, top_n=3):
 with st.sidebar:
     st.header("📄 知识库管理")
     
+    # ---- 初始化 ----
+    if "knowledge_bases" not in st.session_state:
+        st.session_state.knowledge_bases = {}  # {name: [texts]}
+    if "active_kb" not in st.session_state:
+        st.session_state.active_kb = None
+    if "messages_rag" not in st.session_state:
+        st.session_state.messages_rag = []
+    
+    # ---- 当前使用的知识库 ----
+    if st.session_state.knowledge_bases:
+        st.subheader("📌 当前知识库")
+        kb_names = list(st.session_state.knowledge_bases.keys())
+        if st.session_state.active_kb not in kb_names:
+            st.session_state.active_kb = kb_names[0]
+        
+        selected = st.selectbox(
+            "选择知识库",
+            kb_names,
+            index=kb_names.index(st.session_state.active_kb),
+            key="kb_selector"
+        )
+        if selected != st.session_state.active_kb:
+            st.session_state.active_kb = selected
+            st.session_state.messages_rag = []
+            st.rerun()
+        
+        col_a, col_b = st.columns([4, 1])
+        with col_a:
+            st.caption(f"共 {len(st.session_state.knowledge_bases[st.session_state.active_kb])} 条知识")
+        with col_b:
+            if st.button("🗑️", key="del_kb", help="删除当前知识库", use_container_width=True):
+                del st.session_state.knowledge_bases[st.session_state.active_kb]
+                st.session_state.active_kb = list(st.session_state.knowledge_bases.keys())[0] if st.session_state.knowledge_bases else None
+                st.session_state.messages_rag = []
+                st.rerun()
+    else:
+        st.info("👆 还没有加载知识库，请在下方添加")
+    
+    st.divider()
+    
     st.subheader("方式一：粘贴文本")
     st.caption("每段知识用 --- 分隔")
+    
+    kb_name = st.text_input("知识库名称", placeholder="例如：我的学习笔记")
     raw_text = st.text_area(
         "知识内容",
-        height=200,
+        height=150,
         placeholder="C语言是编译型语言...\n---\n指针存储内存地址...\n---\nmalloc在堆上分配内存..."
     )
     
     if st.button("✅ 加载我的知识", use_container_width=True):
         if raw_text.strip():
             texts = [t.strip() for t in raw_text.split("---") if t.strip()]
-            st.session_state.kb = create_knowledge_base(texts)
-            st.success(f"✅ 已加载 {len(texts)} 条知识！")
+            name = kb_name.strip() or "我的知识"
+            st.session_state.knowledge_bases[name] = texts
+            if not st.session_state.active_kb:
+                st.session_state.active_kb = name
+            st.success(f"✅ 已加载 {len(texts)} 条知识到「{name}」！")
         else:
             st.warning("请先粘贴知识内容")
     
@@ -143,7 +190,9 @@ with st.sidebar:
                 "Python 的类型注解（Type Hints）：`def greet(name: str) -> str:`。`typing` 模块：`List[int]`, `Optional[int]` = `int | None`（3.10+），`Union[int, str]`，`Callable[[int, int], str]`，`Any`，`Literal['a', 'b']`。`dataclasses.dataclass` 简化数据类定义。",
                 "内存视图和 buffer 协议：`memoryview(obj)` 高效零拷贝切片访问。`ctypes` 调用 C 动态库。`struct` 模块打包/解包 C 结构体。`mmap` 内存映射文件。",
             ]
-            st.session_state.kb = create_knowledge_base(sample_python)
+            st.session_state.knowledge_bases["Python入门"] = sample_python
+            if not st.session_state.active_kb:
+                st.session_state.active_kb = "Python入门"
             st.success(f"✅ 已加载 {len(sample_python)} 条Python知识")
     
     with col2:
@@ -185,14 +234,20 @@ with st.sidebar:
                 "C 语言未定义行为（UB）是标准没有规定结果的代码——可能崩溃、可能错误、可能看似正常运行（最危险）。必须避免：①数组越界；②有符号整数溢出；③解引用 NULL/野指针；④使用未初始化局部变量；⑤除以 0；⑥修改字符串字面量；⑦重复释放或释放非动态分配内存；⑧使用已释放内存（use-after-free）；⑨同一变量在序列点间多次修改（`i = i++`）；⑩违反 strict aliasing 规则；⑪返回局部变量地址；⑫多线程数据竞争。",
                 "安全编码实践：①绝不用 `gets()`（已从 C11 移除），始终用 `fgets`；②用 `snprintf` 代替 `sprintf`；③检查所有 malloc/fopen 返回值是否为 NULL；④数组循环用 `< length` 不是 `<=`；⑤scanf 读取字符串限制宽度：`scanf('%19s', str)`；⑥所有外部输入视为不可信；⑦用 `-Wall -Wextra -Wpedantic -Werror` 编译；⑧开发阶段使用 `-fsanitize=address,undefined` 运行时检测。",
             ]
-            st.session_state.kb = create_knowledge_base(sample_c)
+            st.session_state.knowledge_bases["C语言基础"] = sample_c
+            if not st.session_state.active_kb:
+                st.session_state.active_kb = "C语言基础"
             st.success(f"✅ 已加载 {len(sample_c)} 条C语言知识")
     
-    if "kb" in st.session_state:
-        st.info("📌 知识库已就绪")
-    
     st.divider()
-    if st.button("🗑️ 清空对话", use_container_width=True):
+    
+    if st.button("🗑️ 清空全部知识库", use_container_width=True):
+        st.session_state.knowledge_bases = {}
+        st.session_state.active_kb = None
+        st.session_state.messages_rag = []
+        st.rerun()
+    
+    if st.button("💬 清空对话", use_container_width=True):
         st.session_state.messages_rag = []
         st.rerun()
 
@@ -200,8 +255,7 @@ with st.sidebar:
 # 主对话区域
 # ============================================
 
-if "messages_rag" not in st.session_state:
-    st.session_state.messages_rag = []
+# messages_rag 已在侧边栏初始化
 
 for msg in st.session_state.messages_rag:
     with st.chat_message(msg["role"]):
@@ -213,12 +267,15 @@ if user_input := st.chat_input("基于知识库提问（例如：list和tuple的
     st.session_state.messages_rag.append({"role": "user", "content": user_input})
     
     with st.chat_message("assistant"):
-        if "kb" not in st.session_state:
+        if not st.session_state.active_kb or not st.session_state.knowledge_bases:
             st.warning("⚠️ 请先在左边加载知识库！")
             answer = "请先加载知识库，我才能基于文档回答。点击左边「📥 Python入门」或「📥 C语言基础」加载示例，或粘贴你自己的知识。"
         else:
+            texts = st.session_state.knowledge_bases[st.session_state.active_kb]
+            kb_data = compute_tfidf(tuple(texts))
+            
             with st.spinner("🔍 检索知识库..."):
-                relevant_docs = search_docs(st.session_state.kb, user_input, top_n=3)
+                relevant_docs = search_docs(kb_data, user_input, top_n=3)
             
             context = "\n\n".join(relevant_docs)
             prompt = f"""你是一个严格基于文档的问答助手。
@@ -237,10 +294,16 @@ if user_input := st.chat_input("基于知识库提问（例如：list和tuple的
 
 ## 你的回答："""
             
+            # 🔥 对话记忆：把历史对话传给 DeepSeek，让 AI 理解上下文
+            chat_messages = []
+            for msg in st.session_state.messages_rag[:-1]:  # 已包含历史 user+assistant
+                chat_messages.append({"role": msg["role"], "content": msg["content"]})
+            chat_messages.append({"role": "user", "content": prompt})  # 当前 RAG 增强问题
+            
             with st.spinner("💭 DeepSeek 生成回答..."):
                 response = client.chat.completions.create(
                     model="deepseek-chat",
-                    messages=[{"role": "user", "content": prompt}],
+                    messages=chat_messages,
                     temperature=0.3,
                     max_tokens=2048,
                 )
