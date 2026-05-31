@@ -19,6 +19,242 @@ st.set_page_config(
     layout="centered"
 )
 
+# ============================================
+# 🎨 全局样式注入
+# ============================================
+st.markdown("""
+<style>
+/* ===== 全局背景 ===== */
+.stApp {
+    background: linear-gradient(135deg, #0f0c29 0%, #1a1a3e 50%, #24243e 100%);
+}
+
+/* ===== 浮动 Logo 动画 ===== */
+@keyframes float {
+    0%, 100% { transform: translateY(0px) rotate(0deg); }
+    25%  { transform: translateY(-12px) rotate(2deg); }
+    50%  { transform: translateY(-6px) rotate(-1deg); }
+    75%  { transform: translateY(-18px) rotate(1deg); }
+}
+
+@keyframes glow {
+    0%, 100% { filter: drop-shadow(0 0 8px rgba(139, 92, 246, 0.4)); }
+    50%  { filter: drop-shadow(0 0 24px rgba(139, 92, 246, 0.8)); }
+}
+
+.floating-logo {
+    text-align: center;
+    font-size: 72px;
+    animation: float 3s ease-in-out infinite, glow 2s ease-in-out infinite;
+    margin-bottom: -10px;
+    user-select: none;
+}
+
+/* ===== 渐变色标题 ===== */
+.gradient-title {
+    text-align: center;
+    font-size: 2.2rem !important;
+    font-weight: 800 !important;
+    background: linear-gradient(135deg, #a78bfa 0%, #60a5fa 30%, #34d399 70%, #fbbf24 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 6px !important;
+    padding-bottom: 0 !important;
+}
+
+.gradient-subtitle {
+    text-align: center;
+    color: #94a3b8 !important;
+    font-size: 0.95rem !important;
+}
+
+/* ===== 暗色玻璃侧边栏 ===== */
+[data-testid="stSidebar"] {
+    background: rgba(15, 12, 41, 0.85) !important;
+    backdrop-filter: blur(16px) saturate(140%) !important;
+    -webkit-backdrop-filter: blur(16px) saturate(140%) !important;
+    border-right: 1px solid rgba(139, 92, 246, 0.15) !important;
+    box-shadow: 2px 0 24px rgba(0, 0, 0, 0.3) !important;
+}
+
+[data-testid="stSidebar"] .stMarkdown,
+[data-testid="stSidebar"] label,
+[data-testid="stSidebar"] .stCaption {
+    color: #cbd5e1 !important;
+}
+
+[data-testid="stSidebar"] h1,
+[data-testid="stSidebar"] h2,
+[data-testid="stSidebar"] h3 {
+    color: #e2e8f0 !important;
+}
+
+[data-testid="stSidebar"] .stButton > button {
+    background: rgba(139, 92, 246, 0.15) !important;
+    border: 1px solid rgba(139, 92, 246, 0.3) !important;
+    color: #c4b5fd !important;
+    border-radius: 10px !important;
+    transition: all 0.25s ease !important;
+}
+
+[data-testid="stSidebar"] .stButton > button:hover {
+    background: rgba(139, 92, 246, 0.3) !important;
+    border-color: rgba(139, 92, 246, 0.6) !important;
+    color: #e2e8f0 !important;
+    transform: translateY(-1px);
+}
+
+[data-testid="stSidebar"] textarea,
+[data-testid="stSidebar"] input {
+    background: rgba(30, 27, 75, 0.6) !important;
+    border: 1px solid rgba(139, 92, 246, 0.2) !important;
+    color: #e2e8f0 !important;
+    border-radius: 8px !important;
+}
+
+[data-testid="stSidebar"] textarea:focus,
+[data-testid="stSidebar"] input:focus {
+    border-color: rgba(139, 92, 246, 0.6) !important;
+    box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.15) !important;
+}
+
+[data-testid="stSidebar"] hr {
+    border-color: rgba(139, 92, 246, 0.12) !important;
+}
+
+[data-testid="stSidebar"] .stSelectbox [data-baseweb="select"] {
+    background: rgba(30, 27, 75, 0.6) !important;
+    border-color: rgba(139, 92, 246, 0.25) !important;
+}
+
+/* ===== 聊天气泡滑入动画 ===== */
+@keyframes slideIn {
+    0%   { opacity: 0; transform: translateY(18px) scale(0.96); }
+    100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+[data-testid="stChatMessage"] {
+    animation: slideIn 0.45s cubic-bezier(0.22, 0.61, 0.36, 1) both !important;
+}
+
+[data-testid="stChatMessage"]:nth-child(1) { animation-delay: 0.05s; }
+[data-testid="stChatMessage"]:nth-child(2) { animation-delay: 0.15s; }
+[data-testid="stChatMessage"]:nth-child(3) { animation-delay: 0.25s; }
+[data-testid="stChatMessage"]:nth-child(4) { animation-delay: 0.32s; }
+[data-testid="stChatMessage"]:nth-child(5) { animation-delay: 0.38s; }
+[data-testid="stChatMessage"]:nth-child(6) { animation-delay: 0.43s; }
+
+/* 用户气泡 */
+[data-testid="stChatMessage"][data-testid="user-message"] {
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(59, 130, 246, 0.15)) !important;
+    border: 1px solid rgba(139, 92, 246, 0.2) !important;
+    border-radius: 16px 4px 16px 16px !important;
+    padding: 12px 16px !important;
+    margin: 6px 0 !important;
+}
+
+/* 助手气泡 */
+[data-testid="stChatMessage"][data-testid="assistant-message"] {
+    background: rgba(30, 27, 75, 0.5) !important;
+    border: 1px solid rgba(148, 163, 184, 0.1) !important;
+    border-radius: 4px 16px 16px 16px !important;
+    padding: 12px 16px !important;
+    margin: 6px 0 !important;
+}
+
+/* ===== 登录页卡片 ===== */
+.login-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 80vh;
+}
+
+.login-card {
+    background: rgba(30, 27, 75, 0.55);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(139, 92, 246, 0.2);
+    border-radius: 24px;
+    padding: 48px 40px;
+    max-width: 420px;
+    width: 100%;
+    box-shadow: 0 8px 48px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(139, 92, 246, 0.08) inset;
+    text-align: center;
+}
+
+.login-card .floating-logo {
+    font-size: 64px;
+    margin-bottom: 8px;
+}
+
+.login-card-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, #a78bfa, #60a5fa);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 4px;
+}
+
+.login-card-subtitle {
+    color: #94a3b8;
+    font-size: 0.9rem;
+    margin-bottom: 28px;
+}
+
+/* ===== 全局组件 ===== */
+/* 主页面按钮 */
+.stButton > button {
+    border-radius: 12px !important;
+    font-weight: 600 !important;
+    transition: all 0.25s ease !important;
+}
+
+.stButton > button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(139, 92, 246, 0.25) !important;
+}
+
+/* 输入框 */
+.stTextInput > div > div > input {
+    border-radius: 10px !important;
+}
+
+/* 成功/信息提示 */
+.stSuccess, .stInfo {
+    border-radius: 10px !important;
+}
+
+/* 隐藏默认 header */
+[data-testid="stHeader"] {
+    background: transparent !important;
+}
+
+/* Expander */
+.streamlit-expanderHeader {
+    border-radius: 10px !important;
+}
+
+/* 滚动条 */
+::-webkit-scrollbar {
+    width: 6px;
+}
+::-webkit-scrollbar-track {
+    background: rgba(15, 12, 41, 0.3);
+}
+::-webkit-scrollbar-thumb {
+    background: rgba(139, 92, 246, 0.3);
+    border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(139, 92, 246, 0.5);
+}
+</style>
+""", unsafe_allow_html=True)
+
 # ===== 🔐 密码保护 =====
 ACCESS_PASSWORD = os.getenv("ACCESS_PASSWORD", "jjztaishuaile")
 
@@ -26,20 +262,28 @@ if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
 
 if not st.session_state.authenticated:
-    st.title("🔐 私人AI助手")
-    st.caption("请输入密码访问")
-    password = st.text_input("密码", type="password")
-    if st.button("登录"):
-        if password == ACCESS_PASSWORD:
-            st.session_state.authenticated = True
-            st.rerun()
-        else:
-            st.error("密码错误！")
+    # 卡片式登录页 — card 先不关闭，让 Streamlit 控件落在卡片内
+    st.markdown('<div class="login-container"><div class="login-card">', unsafe_allow_html=True)
+    st.markdown('<div class="floating-logo">🤖</div>', unsafe_allow_html=True)
+    st.markdown('<div class="login-card-title">私人 AI 助手</div>', unsafe_allow_html=True)
+    st.markdown('<div class="login-card-subtitle">请输入密码以访问知识库</div>', unsafe_allow_html=True)
+    password = st.text_input("密码", type="password", placeholder="输入访问密码", label_visibility="collapsed")
+    col_btn1, col_btn2, col_btn3 = st.columns([1, 1, 1])
+    with col_btn2:
+        if st.button("🔓 登 录", use_container_width=True):
+            if password == ACCESS_PASSWORD:
+                st.session_state.authenticated = True
+                st.rerun()
+            else:
+                st.error("密码错误！")
+    st.markdown('</div></div>', unsafe_allow_html=True)
     st.stop()
 
 # ============================================
-st.title("📚 DeepSeek 知识库问答机器人")
-st.caption("上传专属知识 → DeepSeek 基于你的文档回答 · 私人版")
+# 主页面标题（浮动Logo + 渐变标题）
+st.markdown('<div class="floating-logo">🤖</div>', unsafe_allow_html=True)
+st.markdown('<h1 class="gradient-title">DeepSeek 知识库问答机器人</h1>', unsafe_allow_html=True)
+st.markdown('<p class="gradient-subtitle">上传专属知识 → DeepSeek 基于你的文档回答 · 私人版</p>', unsafe_allow_html=True)
 
 @st.cache_resource
 def get_client():
