@@ -51,9 +51,13 @@ client = get_client()
 
 @st.cache_resource
 def compute_tfidf(texts_tuple):
-    """缓存 TF-IDF 计算结果。texts_tuple 必须是 tuple（hashable）。"""
+    """缓存 TF-IDF 计算结果。texts_tuple 必须是 tuple（hashable）。
+    
+    使用 char_wb + 1~3 字 n-gram，确保中文检索精度。
+    旧版 TfidfVectorizer() 默认按空格分词，中文全挤成1个token → 全0分。
+    """
     texts = list(texts_tuple)
-    vectorizer = TfidfVectorizer()
+    vectorizer = TfidfVectorizer(analyzer='char_wb', ngram_range=(1, 3))
     doc_vectors = vectorizer.fit_transform(texts)
     return vectorizer, doc_vectors, texts
 
